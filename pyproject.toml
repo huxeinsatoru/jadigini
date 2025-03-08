@@ -6,5 +6,6 @@ authors = ["Your Name <you@example.com>"]
 requires-python = ">=3.11"
 dependencies = [
     "discord",
-    "requests"
+    "discord-py>=2.5.2",
+    "requests",
 ]
