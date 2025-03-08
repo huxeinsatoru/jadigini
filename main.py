@@ -5,9 +5,8 @@ import os
 from discord.ext import commands
 
 # Konfigurasi bot
-TOKEN = os.getenv(
-    "eRPdb7ESI5IJTMdIXxknGDykdzAIWS32")  # Gunakan Secrets di Replit
-SCRIN_API_TOKEN = os.getenv("209119lf15248f5d6e53273656ce60f5a49827b")
+TOKEN = os.getenv("DISCORD_TOKEN")  # Gunakan Secrets di Replit
+SCRIN_API_TOKEN = os.getenv("SCRIN_API_TOKEN")
 EXCHANGE_API_URL = "https://cdn.jsdelivr.net/gh/fawazahmed0/currency-api@latest/v1/currencies/usd/idr.json"
 
 intents = discord.Intents.default()
