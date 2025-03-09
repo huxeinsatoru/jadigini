@@ -89,15 +89,15 @@ async def set_command(interaction: discord.Interaction, xssm_token: str, rate_pe
         "discord_id": interaction.user.id
     }
     save_user_data()
-    await interaction.response.send_message("✅ Data gaji kamu telah disimpan secara aman.", ephemeral=True)
+    await interaction.response.send_message("✅ Berhasil Disimpan.", ephemeral=True)
 
 # Perintah untuk reset data
-@tree.command(name="reset", description="Hapus data Scrin.io yang tersimpan")
+@tree.command(name="reset", description="Hapus data scrin.io yang tersimpan")
 async def reset_command(interaction: discord.Interaction):
     if str(interaction.user.id) in user_data:
         del user_data[str(interaction.user.id)]
         save_user_data()
-        await interaction.response.send_message("✅ Data gaji kamu telah dihapus.", ephemeral=True)
+        await interaction.response.send_message("✅ Berhasil Dihapus.", ephemeral=True)
     else:
         await interaction.response.send_message("❌ Kamu belum menyimpan data.", ephemeral=True)
 
