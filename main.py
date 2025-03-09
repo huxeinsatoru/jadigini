@@ -81,7 +81,7 @@ def format_usd(amount):
     return f"{amount:,.2f}".replace(",", ".")
 
 # Perintah untuk menyimpan token dan rate per jam
-@tree.command(name="set", description="Simpan token scrin.io dan rate per jam")
+@tree.command(name="set", description="Set up awal")
 async def set_command(interaction: discord.Interaction, xssm_token: str, rate_per_hour: float):
     user_data[str(interaction.user.id)] = {
         "token": xssm_token,
