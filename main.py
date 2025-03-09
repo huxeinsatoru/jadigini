@@ -1,63 +1,172 @@
+import os
+import json
+from dotenv import load_dotenv
 import discord
 import requests
-import os
-
 from discord.ext import commands
+from discord import app_commands
+from flask import Flask
+from threading import Thread
 
-# Konfigurasi bot
-TOKEN = os.getenv("DISCORD_TOKEN")  # Gunakan Secrets di Replit
-SCRIN_API_TOKEN = os.getenv("SCRIN_API_TOKEN")
-EXCHANGE_API_URL = "https://cdn.jsdelivr.net/gh/fawazahmed0/currency-api@latest/v1/currencies/usd/idr.json"
+# Load Token dari .env
+load_dotenv()
+TOKEN_DISCORD = os.getenv("DISCORD_BOT_TOKEN")
 
+# Inisialisasi Flask untuk uptime
+app = Flask(__name__)
+
+@app.route("/")
+def home():
+    return "Bot is running!"
+
+def run():
+    app.run(host="0.0.0.0", port=8080)
+
+def keep_alive():
+    server = Thread(target=run)
+    server.start()
+
+# Inisialisasi bot dengan intents
 intents = discord.Intents.default()
-bot = commands.Bot(command_prefix="!", intents=intents)
+intents.message_content = True
+bot = commands.Bot(command_prefix=commands.when_mentioned, intents=intents)
+tree = bot.tree  # Shortcut untuk slash commands
 
+USER_DATA_FILE = "user_data.json"
 
-# Fungsi untuk mendapatkan total jam kerja dari Scrin
-def get_total_hours():
-    url = "https://scrin.io/api/v2/GetCommonData"
+# Load user data
+if os.path.exists(USER_DATA_FILE):
+    with open(USER_DATA_FILE, "r") as file:
+        user_data = json.load(file)
+else:
+    user_data = {}
+
+def save_user_data():
+    with open(USER_DATA_FILE, "w") as file:
+        json.dump(user_data, file, indent=4)
+
+# Function untuk mendapatkan data kerja dari Scrin.io
+def get_work_data(xssm_token, period="isMonth"):
+    url = "https://scrin.io/api/v2/GetReport"
     headers = {
         "Content-Type": "application/json",
-        "x-ssm-token": SCRIN_API_TOKEN,
-        "X-Requested-With": "XMLHttpRequest",
+        "X-SSM-Token": xssm_token,
+        "X-Requested-With": "XMLHttpRequest"
     }
+    data = {
+        "empl": [343684],  # Ganti dengan ID pengguna Scrin.io
+        period: True,
+        "group": ["employee"]
+    }
+    response = requests.post(url, headers=headers, json=data)
 
-    response = requests.post(url, headers=headers, json={})
-    data = response.json()
+    if response.status_code == 200:
+        return response.json()
+    return None
 
-    try:
-        # Ambil total jam kerja (harus disesuaikan dengan format JSON)
-        total_hours = 40  # Contoh statis, ganti dengan parsing dari data
-        return total_hours
-    except:
-        return None
+# Function untuk mendapatkan kurs USD ke IDR
+def get_exchange_rate():
+    url = "https://api.exchangerate-api.com/v4/latest/USD"
+    response = requests.get(url)
+    if response.status_code == 200:
+        return response.json().get("rates", {}).get("IDR", 16000)  # Default 16,000 jika API gagal
+    return 16000
 
+# Fungsi untuk format IDR
+def format_idr(amount):
+    return f"{int(amount):,}".replace(",", ".")
 
-# Fungsi untuk konversi USD ke IDR
-def get_usd_to_idr():
-    response = requests.get(EXCHANGE_API_URL)
-    data = response.json()
+# Fungsi untuk format USD
+def format_usd(amount):
+    return f"{amount:,.2f}".replace(",", ".")
 
-    return data.get("idr", 15000)  # Default 15.000 kalau gagal
+# Perintah untuk menyimpan token dan rate per jam
+@tree.command(name="set", description="Simpan token scrin.io dan rate per jam")
+async def set_command(interaction: discord.Interaction, xssm_token: str, rate_per_hour: float):
+    user_data[str(interaction.user.id)] = {
+        "token": xssm_token,
+        "rate": rate_per_hour,
+        "discord_id": interaction.user.id
+    }
+    save_user_data()
+    await interaction.response.send_message("✅ Data gaji kamu telah disimpan secara aman.", ephemeral=True)
 
+# Perintah untuk reset data
+@tree.command(name="reset", description="Hapus data Scrin.io yang tersimpan")
+async def reset_command(interaction: discord.Interaction):
+    if str(interaction.user.id) in user_data:
+        del user_data[str(interaction.user.id)]
+        save_user_data()
+        await interaction.response.send_message("✅ Data gaji kamu telah dihapus.", ephemeral=True)
+    else:
+        await interaction.response.send_message("❌ Kamu belum menyimpan data.", ephemeral=True)
 
-@bot.command()
-async def gaji(ctx, pay_per_hour: float):
-    total_hours = get_total_hours()
-    if total_hours is None:
-        await ctx.send("Gagal mendapatkan data jam kerja.")
+# Fungsi untuk mengecek gaji berdasarkan periode
+async def check_salary(interaction: discord.Interaction, period: str, label: str):
+    user = interaction.user
+    if str(user.id) not in user_data:
+        await interaction.response.send_message("❌ Kamu belum memasukkan token dan rate per jam. Gunakan `/set`", ephemeral=True)
         return
 
-    usd_to_idr = get_usd_to_idr()
+    data = user_data[str(user.id)]
+    work_data = get_work_data(data["token"], period)
 
-    salary_usd = total_hours * pay_per_hour
-    salary_idr = salary_usd * usd_to_idr
+    if not work_data or "charts" not in work_data or "timeline" not in work_data["charts"]:
+        await interaction.response.send_message(f"❌ Gagal mengambil data gaji untuk {label}.", ephemeral=True)
+        return
 
-    await ctx.send(f"💰 **Total Gaji:**\n"
-                   f"- **{total_hours} Jam** kerja\n"
-                   f"- **${salary_usd:.2f}** USD\n"
-                   f"- **Rp{salary_idr:,.0f}** IDR (kurs {usd_to_idr:,.0f})")
+    total_minutes = sum(entry["Duration"] for entry in work_data["charts"]["timeline"])
+    total_hours = total_minutes // 60
+    remaining_minutes = total_minutes % 60
 
+    usd_to_idr = get_exchange_rate()
+    total_salary_idr = (total_minutes / 60) * data["rate"] * usd_to_idr
+    total_salary_usd = total_salary_idr / usd_to_idr
 
-# Menjalankan bot
-bot.run(TOKEN)
+    formatted_salary_idr = format_idr(total_salary_idr)
+    formatted_salary_usd = format_usd(total_salary_usd)
+
+    message = f"**{label}** {formatted_salary_usd} USD / {formatted_salary_idr} IDR — {total_hours} Jam {remaining_minutes} Menit"
+    await interaction.response.send_message(message)
+
+# Perintah untuk melihat gaji berdasarkan periode
+@tree.command(name="hariini", description="Cek gaji hari ini")
+async def hariini(interaction: discord.Interaction):
+    await check_salary(interaction, "isToday", "Hari ini")
+
+@tree.command(name="kemarin", description="Cek gaji kemarin")
+async def kemarin(interaction: discord.Interaction):
+    await check_salary(interaction, "isYesterday", "Kemarin")
+
+@tree.command(name="bulanini", description="Cek gaji bulan ini")
+async def bulanini(interaction: discord.Interaction):
+    await check_salary(interaction, "isMonth", "Bulan ini")
+
+@tree.command(name="tahunini", description="Cek gaji tahun ini")
+async def tahunini(interaction: discord.Interaction):
+    await check_salary(interaction, "isYear", "Tahun ini")
+
+@tree.command(name="bulanlalu", description="Cek gaji bulan lalu")
+async def bulanlalu(interaction: discord.Interaction):
+    await check_salary(interaction, "isPrevMonth", "Bulan lalu")
+
+@tree.command(name="minggulalu", description="Cek gaji minggu lalu")
+async def minggulalu(interaction: discord.Interaction):
+    await check_salary(interaction, "isPrevWeek", "Minggu lalu")
+
+@tree.command(name="tahunlalu", description="Cek gaji tahun lalu")
+async def tahunlalu(interaction: discord.Interaction):
+    await check_salary(interaction, "isPrevYear", "Tahun lalu")
+
+# Event saat bot siap
+@bot.event
+async def on_ready():
+    print(f"✅ Bot {bot.user} siap!")
+    try:
+        synced = await bot.tree.sync()
+        print(f"✅ {len(synced)} perintah slash berhasil disinkronkan.")
+    except Exception as e:
+        print(f"❌ Sync error: {e}")
+
+keep_alive()
+bot.run(TOKEN_DISCORD)
