@@ -127,7 +127,7 @@ async def check_salary(interaction: discord.Interaction, period: str, label: str
     formatted_salary_usd = format_usd(total_salary_usd)
 
     message = f"**{label}** {formatted_salary_usd} USD / {formatted_salary_idr} IDR — {total_hours} Jam {remaining_minutes} Menit"
-    await interaction.response.send_message(message)
+    await interaction.response.send_message(message, ephemeral=True)
 
 # Perintah untuk melihat gaji berdasarkan periode
 @tree.command(name="hariini", description="Cek gaji hari ini")
