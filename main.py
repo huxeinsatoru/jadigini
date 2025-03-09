@@ -127,13 +127,7 @@ async def check_salary(interaction: discord.Interaction, period: str, label: str
     formatted_salary_usd = format_usd(total_salary_usd)
 
     message = f"**{label}** {formatted_salary_usd} USD / {formatted_salary_idr} IDR — {total_hours} Jam {remaining_minutes} Menit"
-    
-    # Kirim pesan ke DM pengguna
-    try:
-        await user.send(message)
-        await interaction.response.send_message("✅ Gaji telah dikirim ke DM kamu.", ephemeral=True)
-    except discord.Forbidden:
-        await interaction.response.send_message("❌ Tidak bisa mengirim DM. Pastikan kamu mengaktifkan DM dari server ini.", ephemeral=True)
+    await interaction.response.send_message(message, ephemeral=True)
 
 # Perintah untuk melihat gaji berdasarkan periode
 @tree.command(name="hariini", description="Cek gaji hari ini")
@@ -173,15 +167,6 @@ async def on_ready():
         print(f"✅ {len(synced)} perintah slash berhasil disinkronkan.")
     except Exception as e:
         print(f"❌ Sync error: {e}")
-
-# Event untuk menangani DM
-@bot.event
-async def on_message(message):
-    if message.author == bot.user:
-        return  # Hindari bot membalas dirinya sendiri
-    
-    if message.guild is None:  # Jika pesan dikirim di DM
-        await message.channel.send("Halo! Saya hanya bisa merespons di DM. Ada yang bisa saya bantu?")
 
 keep_alive()
 bot.run(TOKEN_DISCORD)
