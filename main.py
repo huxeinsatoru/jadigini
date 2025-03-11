@@ -172,28 +172,6 @@ async def minggulalu(interaction: discord.Interaction):
 async def tahunlalu(interaction: discord.Interaction):
     await check_salary(interaction, "isPrevYear", "Tahun lalu")
 
-
-# Function untuk mendapatkan kurs USD ke IDR
-def get_exchange_rate():
-    url = "https://api.exchangerate-api.com/v4/latest/USD"
-    response = requests.get(url)
-    if response.status_code == 200:
-        return (
-            response.json().get("rates", {}).get("IDR", 16000)
-        )  # Default 16,000 jika API gagal
-    return 16000
-
-
-# Fungsi untuk format IDR
-def format_idr(amount):
-    return f"{int(amount):,}".replace(",", ".")
-
-
-# Fungsi untuk format USD
-def format_usd(amount):
-    return f"{amount:,.2f}".replace(",", ".")
-
-
 # Perintah untuk konversi USD ke IDR
 @tree.command(name="usd", description="Konversi USD ke IDR")
 async def usd(interaction: discord.Interaction, amount: float):
