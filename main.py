@@ -53,7 +53,7 @@ def get_work_data(xssm_token, period="isMonth"):
 
 # Function untuk mendapatkan kurs USD ke IDR
 def get_exchange_rate():
-    url = "https://api.exchangerate-api.com/v4/latest/USD"
+    url = "https://open.er-api.com/v6/latest/USD"
     response = requests.get(url)
     if response.status_code == 200:
         return (
