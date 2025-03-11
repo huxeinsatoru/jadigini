@@ -5,26 +5,10 @@ import discord
 import requests
 from discord.ext import commands
 from discord import app_commands
-from flask import Flask
-from threading import Thread
 
 # Load Token dari .env
 load_dotenv()
 TOKEN_DISCORD = os.getenv("DISCORD_BOT_TOKEN")
-
-# Inisialisasi Flask untuk uptime
-app = Flask(__name__)
-
-@app.route("/")
-def home():
-    return "Bot is running!"
-
-def run():
-    app.run(host="0.0.0.0", port=8080)
-
-def keep_alive():
-    server = Thread(target=run)
-    server.start()
 
 # Inisialisasi bot dengan intents
 intents = discord.Intents.default()
@@ -41,9 +25,11 @@ if os.path.exists(USER_DATA_FILE):
 else:
     user_data = {}
 
+
 def save_user_data():
     with open(USER_DATA_FILE, "w") as file:
         json.dump(user_data, file, indent=4)
+
 
 # Function untuk mendapatkan data kerja dari Scrin.io
 def get_work_data(xssm_token, period="isMonth"):
@@ -51,12 +37,12 @@ def get_work_data(xssm_token, period="isMonth"):
     headers = {
         "Content-Type": "application/json",
         "X-SSM-Token": xssm_token,
-        "X-Requested-With": "XMLHttpRequest"
+        "X-Requested-With": "XMLHttpRequest",
     }
     data = {
         "empl": [343684],  # Ganti dengan ID pengguna Scrin.io
         period: True,
-        "group": ["employee"]
+        "group": ["employee"],
     }
     response = requests.post(url, headers=headers, json=data)
 
@@ -64,32 +50,41 @@ def get_work_data(xssm_token, period="isMonth"):
         return response.json()
     return None
 
+
 # Function untuk mendapatkan kurs USD ke IDR
 def get_exchange_rate():
     url = "https://api.exchangerate-api.com/v4/latest/USD"
     response = requests.get(url)
     if response.status_code == 200:
-        return response.json().get("rates", {}).get("IDR", 16000)  # Default 16,000 jika API gagal
+        return (
+            response.json().get("rates", {}).get("IDR", 16000)
+        )  # Default 16,000 jika API gagal
     return 16000
+
 
 # Fungsi untuk format IDR
 def format_idr(amount):
     return f"{int(amount):,}".replace(",", ".")
 
+
 # Fungsi untuk format USD
 def format_usd(amount):
     return f"{amount:,.2f}".replace(",", ".")
 
+
 # Perintah untuk menyimpan token dan rate per jam
 @tree.command(name="set", description="Set up awal")
-async def set_command(interaction: discord.Interaction, xssm_token: str, rate_per_hour: float):
+async def set_command(
+    interaction: discord.Interaction, xssm_token: str, rate_per_hour: float
+):
     user_data[str(interaction.user.id)] = {
         "token": xssm_token,
         "rate": rate_per_hour,
-        "discord_id": interaction.user.id
+        "discord_id": interaction.user.id,
     }
     save_user_data()
     await interaction.response.send_message("✅ Berhasil Disimpan.", ephemeral=True)
+
 
 # Perintah untuk reset data
 @tree.command(name="reset", description="Hapus data scrin.io yang tersimpan")
@@ -99,20 +94,32 @@ async def reset_command(interaction: discord.Interaction):
         save_user_data()
         await interaction.response.send_message("✅ Berhasil Dihapus.", ephemeral=True)
     else:
-        await interaction.response.send_message("❌ Kamu belum menyimpan data.", ephemeral=True)
+        await interaction.response.send_message(
+            "❌ Kamu belum menyimpan data.", ephemeral=True
+        )
+
 
 # Fungsi untuk mengecek gaji berdasarkan periode
 async def check_salary(interaction: discord.Interaction, period: str, label: str):
     user = interaction.user
     if str(user.id) not in user_data:
-        await interaction.response.send_message("❌ Kamu belum memasukkan token dan rate per jam. Gunakan `/set`", ephemeral=True)
+        await interaction.response.send_message(
+            "❌ Kamu belum memasukkan token dan rate per jam. Gunakan `/set`",
+            ephemeral=True,
+        )
         return
 
     data = user_data[str(user.id)]
     work_data = get_work_data(data["token"], period)
 
-    if not work_data or "charts" not in work_data or "timeline" not in work_data["charts"]:
-        await interaction.response.send_message(f"❌ Gagal mengambil data gaji untuk {label}.", ephemeral=True)
+    if (
+        not work_data
+        or "charts" not in work_data
+        or "timeline" not in work_data["charts"]
+    ):
+        await interaction.response.send_message(
+            f"❌ Gagal mengambil data gaji untuk {label}.", ephemeral=True
+        )
         return
 
     total_minutes = sum(entry["Duration"] for entry in work_data["charts"]["timeline"])
@@ -129,34 +136,85 @@ async def check_salary(interaction: discord.Interaction, period: str, label: str
     message = f"**{label}** {formatted_salary_usd} USD / {formatted_salary_idr} IDR — {total_hours} Jam {remaining_minutes} Menit"
     await interaction.response.send_message(message, ephemeral=True)
 
+
 # Perintah untuk melihat gaji berdasarkan periode
 @tree.command(name="hariini", description="Cek gaji hari ini")
 async def hariini(interaction: discord.Interaction):
     await check_salary(interaction, "isToday", "Hari ini")
 
+
 @tree.command(name="kemarin", description="Cek gaji kemarin")
 async def kemarin(interaction: discord.Interaction):
     await check_salary(interaction, "isYesterday", "Kemarin")
+
 
 @tree.command(name="bulanini", description="Cek gaji bulan ini")
 async def bulanini(interaction: discord.Interaction):
     await check_salary(interaction, "isMonth", "Bulan ini")
 
+
 @tree.command(name="tahunini", description="Cek gaji tahun ini")
 async def tahunini(interaction: discord.Interaction):
     await check_salary(interaction, "isYear", "Tahun ini")
+
 
 @tree.command(name="bulanlalu", description="Cek gaji bulan lalu")
 async def bulanlalu(interaction: discord.Interaction):
     await check_salary(interaction, "isPrevMonth", "Bulan lalu")
 
+
 @tree.command(name="minggulalu", description="Cek gaji minggu lalu")
 async def minggulalu(interaction: discord.Interaction):
     await check_salary(interaction, "isPrevWeek", "Minggu lalu")
 
+
 @tree.command(name="tahunlalu", description="Cek gaji tahun lalu")
 async def tahunlalu(interaction: discord.Interaction):
     await check_salary(interaction, "isPrevYear", "Tahun lalu")
+
+
+# Function untuk mendapatkan kurs USD ke IDR
+def get_exchange_rate():
+    url = "https://api.exchangerate-api.com/v4/latest/USD"
+    response = requests.get(url)
+    if response.status_code == 200:
+        return (
+            response.json().get("rates", {}).get("IDR", 16000)
+        )  # Default 16,000 jika API gagal
+    return 16000
+
+
+# Fungsi untuk format IDR
+def format_idr(amount):
+    return f"{int(amount):,}".replace(",", ".")
+
+
+# Fungsi untuk format USD
+def format_usd(amount):
+    return f"{amount:,.2f}".replace(",", ".")
+
+
+# Perintah untuk konversi USD ke IDR
+@tree.command(name="usd", description="Konversi USD ke IDR")
+async def usd(interaction: discord.Interaction, amount: float):
+    exchange_rate = get_exchange_rate()
+    converted_idr = amount * exchange_rate
+    formatted_idr = format_idr(converted_idr)
+    await interaction.response.send_message(
+        f"{amount} USD = {formatted_idr} IDR", ephemeral=True
+    )
+
+
+# Perintah untuk konversi IDR ke USD
+@tree.command(name="idr", description="Konversi IDR ke USD")
+async def idr(interaction: discord.Interaction, amount: float):
+    exchange_rate = get_exchange_rate()
+    converted_usd = amount / exchange_rate
+    formatted_usd = format_usd(converted_usd)
+    await interaction.response.send_message(
+        f"{format_idr(amount)} IDR = {formatted_usd} USD", ephemeral=True
+    )
+
 
 # Event saat bot siap
 @bot.event
@@ -167,51 +225,6 @@ async def on_ready():
         print(f"✅ {len(synced)} perintah slash berhasil disinkronkan.")
     except Exception as e:
         print(f"❌ Sync error: {e}")
-        
-# Fungsi konversi USD ke IDR dan sebaliknya
-@bot.command()
-async def usd(ctx, amount: float):
-    exchange_rate = get_exchange_rate()
-    converted_idr = amount * exchange_rate
-    formatted_idr = format_idr(converted_idr)
-    await ctx.send(f'💵 {amount} USD = {formatted_idr} IDR')
 
-@bot.command()
-async def idr(ctx, amount: float):
-    exchange_rate = get_exchange_rate()
-    converted_usd = amount / exchange_rate
-    formatted_usd = format_usd(converted_usd)
-    await ctx.send(f'💵 {format_idr(amount)} IDR = {formatted_usd} USD')
 
-# Event saat bot menerima pesan
-@bot.event
-async def on_message(message):
-    if message.author == bot.user:
-        return
-    
-    content = message.content.strip()
-    
-    if content.startswith("/usd "):
-        try:
-            amount = float(content.split("/usd ")[1].replace(",", ""))
-            exchange_rate = get_exchange_rate()
-            converted_idr = amount * exchange_rate
-            formatted_idr = format_idr(converted_idr)
-            await message.channel.send(f'💵 {amount} USD = {formatted_idr} IDR')
-        except ValueError:
-            await message.channel.send("❌ Format salah! Gunakan `/usd <jumlah>`")
-    
-    elif content.startswith("/idr "):
-        try:
-            amount = float(content.split("/idr ")[1].replace(",", ""))
-            exchange_rate = get_exchange_rate()
-            converted_usd = amount / exchange_rate
-            formatted_usd = format_usd(converted_usd)
-            await message.channel.send(f'💵 {format_idr(amount)} IDR = {formatted_usd} USD')
-        except ValueError:
-            await message.channel.send("❌ Format salah! Gunakan `/idr <jumlah>`")
-    
-    await bot.process_commands(message)
-    
-keep_alive()
 bot.run(TOKEN_DISCORD)
