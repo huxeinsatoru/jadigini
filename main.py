@@ -167,6 +167,51 @@ async def on_ready():
         print(f"✅ {len(synced)} perintah slash berhasil disinkronkan.")
     except Exception as e:
         print(f"❌ Sync error: {e}")
+        
+# Fungsi konversi USD ke IDR dan sebaliknya
+@bot.command()
+async def usd(ctx, amount: float):
+    exchange_rate = get_exchange_rate()
+    converted_idr = amount * exchange_rate
+    formatted_idr = format_idr(converted_idr)
+    await ctx.send(f'💵 {amount} USD = {formatted_idr} IDR')
 
+@bot.command()
+async def idr(ctx, amount: float):
+    exchange_rate = get_exchange_rate()
+    converted_usd = amount / exchange_rate
+    formatted_usd = format_usd(converted_usd)
+    await ctx.send(f'💵 {format_idr(amount)} IDR = {formatted_usd} USD')
+
+# Event saat bot menerima pesan
+@bot.event
+async def on_message(message):
+    if message.author == bot.user:
+        return
+    
+    content = message.content.strip()
+    
+    if content.startswith("/usd "):
+        try:
+            amount = float(content.split("/usd ")[1].replace(",", ""))
+            exchange_rate = get_exchange_rate()
+            converted_idr = amount * exchange_rate
+            formatted_idr = format_idr(converted_idr)
+            await message.channel.send(f'💵 {amount} USD = {formatted_idr} IDR')
+        except ValueError:
+            await message.channel.send("❌ Format salah! Gunakan `/usd <jumlah>`")
+    
+    elif content.startswith("/idr "):
+        try:
+            amount = float(content.split("/idr ")[1].replace(",", ""))
+            exchange_rate = get_exchange_rate()
+            converted_usd = amount / exchange_rate
+            formatted_usd = format_usd(converted_usd)
+            await message.channel.send(f'💵 {format_idr(amount)} IDR = {formatted_usd} USD')
+        except ValueError:
+            await message.channel.send("❌ Format salah! Gunakan `/idr <jumlah>`")
+    
+    await bot.process_commands(message)
+    
 keep_alive()
 bot.run(TOKEN_DISCORD)
