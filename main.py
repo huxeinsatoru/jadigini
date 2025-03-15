@@ -147,6 +147,10 @@ async def hariini(interaction: discord.Interaction):
 async def kemarin(interaction: discord.Interaction):
     await check_salary(interaction, "isYesterday", "Kemarin")
 
+@tree.command(name="mingguini", description="Cek gaji minggu ini")
+async def kemarin(interaction: discord.Interaction):
+    await check_salary(interaction, "isWeek", "Minggu ini")
+
 
 @tree.command(name="bulanini", description="Cek gaji bulan ini")
 async def bulanini(interaction: discord.Interaction):
